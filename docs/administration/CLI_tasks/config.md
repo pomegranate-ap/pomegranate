@@ -2,7 +2,7 @@
 
 {! backend/administration/CLI_tasks/general_cli_task_info.include !}
 
-## Transfer config from file to DB.
+## Transfer config from file to DB
 
 !!! note
     You need to add the following to your config before executing this command:
@@ -42,4 +42,25 @@ To delete transfered settings from database optional flag `-d` can be used. `<en
 === "From Source"
     ```sh
     mix pleroma.config migrate_from_db [--env=<env>] [-d]
+    ```
+
+## Rollback config version
+
+!!! note
+    You need to add the following to your config before executing this command:
+
+    ```elixir
+    config :pleroma, configurable_from_database: true
+    ```
+
+Rollback will restore last backup by default. If you want to restore older version use `-s` parameter.
+
+=== "OTP"
+    ```sh
+     ./bin/pleroma_ctl config rollback [-s 2]
+    ```
+
+=== "From Source"
+    ```sh
+    mix pleroma.config rollback [-s 2]
     ```

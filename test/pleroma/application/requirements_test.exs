@@ -2,13 +2,13 @@
 # Copyright © 2017-2020 Pleroma Authors <https://pleroma.social/>
 # SPDX-License-Identifier: AGPL-3.0-only
 
-defmodule Pleroma.ApplicationRequirementsTest do
+defmodule Pleroma.Application.RequirementsTest do
   use Pleroma.DataCase
 
   import ExUnit.CaptureLog
   import Mock
 
-  alias Pleroma.ApplicationRequirements
+  alias Pleroma.Application.Requirements
   alias Pleroma.Config
   alias Pleroma.Repo
 
@@ -17,18 +17,18 @@ defmodule Pleroma.ApplicationRequirementsTest do
     setup do: clear_config([Pleroma.Emails.Mailer])
 
     test "raises if welcome email enabled but mail disabled" do
-      Pleroma.Config.put([:welcome, :email, :enabled], true)
-      Pleroma.Config.put([Pleroma.Emails.Mailer, :enabled], false)
+      Config.put([:welcome, :email, :enabled], true)
+      Config.put([Pleroma.Emails.Mailer, :enabled], false)
 
-      assert_raise Pleroma.ApplicationRequirements.VerifyError, "The mail disabled.", fn ->
-        capture_log(&Pleroma.ApplicationRequirements.verify!/0)
+      assert_raise Requirements.VerifyError, "The mail disabled.", fn ->
+        capture_log(&Requirements.verify!/0)
       end
     end
   end
 
   describe "check_confirmation_accounts!" do
     setup_with_mocks([
-      {Pleroma.ApplicationRequirements, [:passthrough],
+      {Pleroma.Application.Requirements, [:passthrough],
        [
          check_migrations_applied!: fn _ -> :ok end
        ]}
@@ -39,33 +39,32 @@ defmodule Pleroma.ApplicationRequirementsTest do
     setup do: clear_config([:instance, :account_activation_required])
 
     test "raises if account confirmation is required but mailer isn't enable" do
-      Pleroma.Config.put([:instance, :account_activation_required], true)
-      Pleroma.Config.put([Pleroma.Emails.Mailer, :enabled], false)
+      Config.put([:instance, :account_activation_required], true)
+      Config.put([Pleroma.Emails.Mailer, :enabled], false)
 
-      assert_raise Pleroma.ApplicationRequirements.VerifyError,
+      assert_raise Requirements.VerifyError,
                    "Account activation enabled, but Mailer is disabled. Cannot send confirmation emails.",
                    fn ->
-                     capture_log(&Pleroma.ApplicationRequirements.verify!/0)
+                     capture_log(&Requirements.verify!/0)
                    end
     end
 
     test "doesn't do anything if account confirmation is disabled" do
-      Pleroma.Config.put([:instance, :account_activation_required], false)
-      Pleroma.Config.put([Pleroma.Emails.Mailer, :enabled], false)
-      assert Pleroma.ApplicationRequirements.verify!() == :ok
+      Config.put([:instance, :account_activation_required], false)
+      Config.put([Pleroma.Emails.Mailer, :enabled], false)
+      assert Requirements.verify!() == :ok
     end
 
     test "doesn't do anything if account confirmation is required and mailer is enabled" do
-      Pleroma.Config.put([:instance, :account_activation_required], true)
-      Pleroma.Config.put([Pleroma.Emails.Mailer, :enabled], true)
-      assert Pleroma.ApplicationRequirements.verify!() == :ok
+      Config.put([:instance, :account_activation_required], true)
+      Config.put([Pleroma.Emails.Mailer, :enabled], true)
+      assert Requirements.verify!() == :ok
     end
   end
 
   describe "check_rum!" do
     setup_with_mocks([
-      {Pleroma.ApplicationRequirements, [:passthrough],
-       [check_migrations_applied!: fn _ -> :ok end]}
+      {Requirements, [:passthrough], [check_migrations_applied!: fn _ -> :ok end]}
     ]) do
       :ok
     end
@@ -76,10 +75,10 @@ defmodule Pleroma.ApplicationRequirementsTest do
       Config.put([:database, :rum_enabled], true)
 
       with_mocks([{Repo, [:passthrough], [exists?: fn _, _ -> false end]}]) do
-        assert_raise ApplicationRequirements.VerifyError,
+        assert_raise Requirements.VerifyError,
                      "Unapplied RUM Migrations detected",
                      fn ->
-                       capture_log(&ApplicationRequirements.verify!/0)
+                       capture_log(&Requirements.verify!/0)
                      end
       end
     end
@@ -88,10 +87,10 @@ defmodule Pleroma.ApplicationRequirementsTest do
       Config.put([:database, :rum_enabled], false)
 
       with_mocks([{Repo, [:passthrough], [exists?: fn _, _ -> true end]}]) do
-        assert_raise ApplicationRequirements.VerifyError,
+        assert_raise Requirements.VerifyError,
                      "RUM Migrations detected",
                      fn ->
-                       capture_log(&ApplicationRequirements.verify!/0)
+                       capture_log(&Requirements.verify!/0)
                      end
       end
     end
@@ -100,7 +99,7 @@ defmodule Pleroma.ApplicationRequirementsTest do
       Config.put([:database, :rum_enabled], true)
 
       with_mocks([{Repo, [:passthrough], [exists?: fn _, _ -> true end]}]) do
-        assert ApplicationRequirements.verify!() == :ok
+        assert Requirements.verify!() == :ok
       end
     end
 
@@ -108,7 +107,7 @@ defmodule Pleroma.ApplicationRequirementsTest do
       Config.put([:database, :rum_enabled], false)
 
       with_mocks([{Repo, [:passthrough], [exists?: fn _, _ -> false end]}]) do
-        assert ApplicationRequirements.verify!() == :ok
+        assert Requirements.verify!() == :ok
       end
     end
   end
@@ -133,17 +132,17 @@ defmodule Pleroma.ApplicationRequirementsTest do
     setup do: clear_config([:i_am_aware_this_may_cause_data_loss, :disable_migration_check])
 
     test "raises if it detects unapplied migrations" do
-      assert_raise ApplicationRequirements.VerifyError,
+      assert_raise Requirements.VerifyError,
                    "Unapplied Migrations detected",
                    fn ->
-                     capture_log(&ApplicationRequirements.verify!/0)
+                     capture_log(&Requirements.verify!/0)
                    end
     end
 
     test "doesn't do anything if disabled" do
       Config.put([:i_am_aware_this_may_cause_data_loss, :disable_migration_check], true)
 
-      assert :ok == ApplicationRequirements.verify!()
+      assert :ok == Requirements.verify!()
     end
   end
 end

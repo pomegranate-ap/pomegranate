@@ -2,7 +2,7 @@
 # Copyright © 2017-2020 Pleroma Authors <https://pleroma.social/>
 # SPDX-License-Identifier: AGPL-3.0-only
 
-defmodule Pleroma.ApplicationRequirements do
+defmodule Pleroma.Application.Requirements do
   @moduledoc """
   The module represents the collection of validations to runs before start server.
   """
@@ -18,12 +18,15 @@ defmodule Pleroma.ApplicationRequirements do
 
   @spec verify!() :: :ok | VerifyError.t()
   def verify! do
+    adapter = Application.get_env(:tesla, :adapter)
+
     :ok
     |> check_system_commands!()
     |> check_confirmation_accounts!()
     |> check_migrations_applied!()
     |> check_welcome_message_config!()
     |> check_rum!()
+    |> check_otp_version(adapter)
     |> handle_result()
   end
 
@@ -202,4 +205,32 @@ defmodule Pleroma.ApplicationRequirements do
       true
     end
   end
+
+  defp check_otp_version(:ok, Tesla.Adapter.Gun) do
+    if version = Pleroma.OTPVersion.version() do
+      [major, minor] =
+        version
+        |> String.split(".")
+        |> Enum.map(&String.to_integer/1)
+        |> Enum.take(2)
+
+      if (major == 22 and minor < 2) or major < 22 do
+        Logger.error("
+            !!!OTP VERSION ERROR!!!
+            You are using gun adapter with OTP version #{version}, which doesn't support correct handling of unordered certificates chains. Please update your Erlang/OTP to at least 22.2.
+            ")
+        {:error, "OTP version error"}
+      else
+        :ok
+      end
+    else
+      Logger.error("
+          !!!OTP VERSION ERROR!!!
+          To support correct handling of unordered certificates chains - OTP version must be > 22.2.
+          ")
+      {:error, "OTP version error"}
+    end
+  end
+
+  defp check_otp_version(result, _), do: result
 end

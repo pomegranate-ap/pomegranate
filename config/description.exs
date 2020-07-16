@@ -1934,19 +1934,13 @@ config :pleroma, :config_description, [
   },
   %{
     group: :pleroma,
+    key: :admin_token,
     label: "Pleroma Admin Token",
-    type: :group,
+    type: :string,
     description:
       "Allows setting a token that can be used to authenticate requests with admin privileges without a normal user account token. Append the `admin_token` parameter to requests to utilize it. (Please reconsider using HTTP Basic Auth or OAuth-based authentication if possible)",
-    children: [
-      %{
-        key: :admin_token,
-        type: :string,
-        description: "Admin token",
-        suggestions: [
-          "Please use a high entropy string or UUID"
-        ]
-      }
+    suggestions: [
+      "Please use a high entropy string or UUID"
     ]
   },
   %{
@@ -2253,16 +2247,11 @@ config :pleroma, :config_description, [
   },
   %{
     group: :pleroma,
+    key: Pleroma.Web.Auth.Authenticator,
     label: "Pleroma Authenticator",
-    type: :group,
+    type: :module,
     description: "Authenticator",
-    children: [
-      %{
-        key: Pleroma.Web.Auth.Authenticator,
-        type: :module,
-        suggestions: [Pleroma.Web.Auth.PleromaAuthenticator, Pleroma.Web.Auth.LDAPAuthenticator]
-      }
-    ]
+    suggestions: [Pleroma.Web.Auth.PleromaAuthenticator, Pleroma.Web.Auth.LDAPAuthenticator]
   },
   %{
     group: :pleroma,

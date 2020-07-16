@@ -2406,4 +2406,7 @@ defmodule Pleroma.User do
     |> Map.put(:bio, HTML.filter_tags(user.bio, filter))
     |> Map.put(:fields, fields)
   end
+
+  @spec email_regex() :: Regex.t()
+  def email_regex, do: @email_regex
 end

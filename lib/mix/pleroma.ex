@@ -4,7 +4,6 @@
 
 defmodule Mix.Pleroma do
   @apps [
-    :restarter,
     :ecto,
     :ecto_sql,
     :postgrex,
@@ -14,12 +13,15 @@ defmodule Mix.Pleroma do
     :swoosh,
     :timex
   ]
+
   @cachex_children ["object", "user", "scrubber", "web_resp"]
+
   @doc "Common functions to be reused in mix tasks"
-  def start_pleroma do
+  @spec start_pleroma([:supervisor.child_spec() | module()]) :: {:ok, pid()}
+  def start_pleroma(additional_childs \\ []) do
     Pleroma.Config.Holder.save_default()
-    Pleroma.Config.Oban.warn()
     Pleroma.Application.limiters_setup()
+    Pleroma.Config.DeprecationWarnings.check_oban_config()
     Application.put_env(:phoenix, :serve_endpoints, false, persistent: true)
 
     unless System.get_env("DEBUG") do
@@ -37,34 +39,25 @@ defmodule Mix.Pleroma do
 
     Enum.each(apps, &Application.ensure_all_started/1)
 
-    children =
-      [
-        Pleroma.Repo,
-        {Pleroma.Config.TransferTask, false},
-        Pleroma.Web.Endpoint,
-        {Oban, Pleroma.Config.get(Oban)}
-      ] ++
-        http_children(adapter)
+    children = [
+      Pleroma.Application.ConfigDependentDeps,
+      Pleroma.Repo,
+      Supervisor.child_spec({Task, &Pleroma.Application.Environment.load_from_db_and_update/0},
+        id: :update_env
+      ),
+      Pleroma.Web.Endpoint
+      | additional_childs
+    ]
 
-    cachex_children = Enum.map(@cachex_children, &Pleroma.Application.build_cachex(&1, []))
+    children = [Pleroma.Application.StartUpDependencies.adapter_module() | children]
+
+    cachex_children =
+      Enum.map(@cachex_children, &Pleroma.Application.StartUpDependencies.cachex_spec({&1, []}))
 
     Supervisor.start_link(children ++ cachex_children,
       strategy: :one_for_one,
       name: Pleroma.Supervisor
     )
-
-    if Pleroma.Config.get(:env) not in [:test, :benchmark] do
-      pleroma_rebooted?()
-    end
-  end
-
-  defp pleroma_rebooted? do
-    if Restarter.Pleroma.rebooted?() do
-      :ok
-    else
-      Process.sleep(10)
-      pleroma_rebooted?()
-    end
   end
 
   def load_pleroma do
@@ -122,11 +115,4 @@ defmodule Mix.Pleroma do
   def escape_sh_path(path) do
     ~S(') <> String.replace(path, ~S('), ~S(\')) <> ~S(')
   end
-
-  defp http_children(Tesla.Adapter.Gun) do
-    Pleroma.Gun.ConnectionPool.children() ++
-      [{Task, &Pleroma.HTTP.AdapterHelper.Gun.limiter_setup/0}]
-  end
-
-  defp http_children(_), do: []
 end

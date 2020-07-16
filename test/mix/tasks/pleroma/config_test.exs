@@ -25,7 +25,11 @@ defmodule Mix.Tasks.Pleroma.ConfigTest do
   setup_all do: clear_config(:configurable_from_database, true)
 
   test "error if file with custom settings doesn't exist" do
-    Mix.Tasks.Pleroma.Config.migrate_to_db("config/not_existance_config_file.exs")
+    Mix.Tasks.Pleroma.Config.run([
+      "migrate_to_db",
+      "--config",
+      "config/not_existance_config_file.exs"
+    ])
 
     assert_receive {:mix_shell, :info,
                     [
@@ -34,7 +38,35 @@ defmodule Mix.Tasks.Pleroma.ConfigTest do
                    15
   end
 
-  describe "migrate_to_db/1" do
+  test "migrate_to_db error if configurable_from_database is not enabled" do
+    clear_config(:configurable_from_database, false)
+
+    Mix.Tasks.Pleroma.Config.run([
+      "migrate_to_db",
+      "--config",
+      "test/fixtures/config/temp.secret.exs"
+    ])
+
+    assert_received {:mix_shell, :error, [message]}
+
+    assert message =~
+             "Migration is not allowed in config. You can change this behavior by setting `config :pleroma, configurable_from_database: true`"
+  end
+
+  test "migrate_from_db error if configurable_from_database is not enabled" do
+    clear_config(:configurable_from_database, false)
+
+    Mix.Tasks.Pleroma.Config.run([
+      "migrate_from_db"
+    ])
+
+    assert_received {:mix_shell, :error, [message]}
+
+    assert message =~
+             "Migration is not allowed in config. You can change this behavior by setting `config :pleroma, configurable_from_database: true`"
+  end
+
+  describe "migrate_to_db task" do
     setup do
       initial = Application.get_env(:quack, :level)
       on_exit(fn -> Application.put_env(:quack, :level, initial) end)
@@ -45,7 +77,11 @@ defmodule Mix.Tasks.Pleroma.ConfigTest do
       clear_config([:media_proxy, :whitelist], ["domain_without_scheme.com"])
       assert Repo.all(ConfigDB) == []
 
-      Mix.Tasks.Pleroma.Config.migrate_to_db("test/fixtures/config/temp.secret.exs")
+      Mix.Tasks.Pleroma.Config.run([
+        "migrate_to_db",
+        "--config",
+        "test/fixtures/config/temp.secret.exs"
+      ])
 
       assert_received {:mix_shell, :error, [message]}
 
@@ -56,25 +92,45 @@ defmodule Mix.Tasks.Pleroma.ConfigTest do
     test "filtered settings are migrated to db" do
       assert Repo.all(ConfigDB) == []
 
-      Mix.Tasks.Pleroma.Config.migrate_to_db("test/fixtures/config/temp.secret.exs")
+      Mix.Tasks.Pleroma.Config.run([
+        "migrate_to_db",
+        "--config",
+        "test/fixtures/config/temp.secret.exs"
+      ])
 
-      config1 = ConfigDB.get_by_params(%{group: ":pleroma", key: ":first_setting"})
-      config2 = ConfigDB.get_by_params(%{group: ":pleroma", key: ":second_setting"})
-      config3 = ConfigDB.get_by_params(%{group: ":quack", key: ":level"})
-      refute ConfigDB.get_by_params(%{group: ":pleroma", key: "Pleroma.Repo"})
-      refute ConfigDB.get_by_params(%{group: ":postgrex", key: ":json_library"})
-      refute ConfigDB.get_by_params(%{group: ":pleroma", key: ":database"})
+      config1 = ConfigDB.get_by_params(%{group: :pleroma, key: :first_setting})
+      config2 = ConfigDB.get_by_params(%{group: :pleroma, key: :second_setting})
+      config3 = ConfigDB.get_by_params(%{group: :quack})
+      refute ConfigDB.get_by_params(%{group: :pleroma, key: Pleroma.Repo})
+      refute ConfigDB.get_by_params(%{group: :postgrex, key: :json_library})
+      refute ConfigDB.get_by_params(%{group: :pleroma, key: :database})
 
       assert config1.value == [key: "value", key2: [Repo]]
       assert config2.value == [key: "value2", key2: ["Activity"]]
-      assert config3.value == :info
+      assert config3.value == [level: :info]
+
+      assert Repo.aggregate(ConfigDB, :count) == 3
+
+      [version] = Repo.all(Pleroma.Config.Version)
+
+      assert version.backup == [
+               pleroma: [
+                 second_setting: [key: "value2", key2: ["Activity"]],
+                 first_setting: [key: "value", key2: [Pleroma.Repo]]
+               ],
+               quack: [level: :info]
+             ]
     end
 
     test "config table is truncated before migration" do
       insert(:config, key: :first_setting, value: [key: "value", key2: ["Activity"]])
       assert Repo.aggregate(ConfigDB, :count, :id) == 1
 
-      Mix.Tasks.Pleroma.Config.migrate_to_db("test/fixtures/config/temp.secret.exs")
+      Mix.Tasks.Pleroma.Config.run([
+        "migrate_to_db",
+        "--config",
+        "test/fixtures/config/temp.secret.exs"
+      ])
 
       config = ConfigDB.get_by_params(%{group: ":pleroma", key: ":first_setting"})
       assert config.value == [key: "value", key2: [Repo]]
@@ -105,6 +161,19 @@ defmodule Mix.Tasks.Pleroma.ConfigTest do
       assert file =~ "config :pleroma, :setting_first,"
       assert file =~ "config :pleroma, :setting_second,"
       assert file =~ "config :quack, :level, :info"
+    end
+
+    test "migrate_from_db with config path in env", %{temp_file: temp_file} do
+      clear_config(:release, true)
+      clear_config(:config_path, "config/temp.exported_from_db.secret.exs")
+
+      insert(:config, key: :setting_first, value: [key: "value", key2: ["Activity"]])
+
+      Mix.Tasks.Pleroma.Config.run(["migrate_from_db", "--env", "temp", "-d"])
+
+      assert Repo.all(ConfigDB) == []
+      file = File.read!(temp_file)
+      assert file =~ "config :pleroma, :setting_first,"
     end
 
     test "load a settings with large values and pass to file", %{temp_file: temp_file} do
@@ -184,6 +253,55 @@ defmodule Mix.Tasks.Pleroma.ConfigTest do
 
       assert file ==
                "#{header}\n\nconfig :pleroma, :instance,\n  name: \"Pleroma\",\n  email: \"example@example.com\",\n  notify_email: \"noreply@example.com\",\n  description: \"A Pleroma instance, an alternative fediverse server\",\n  limit: 5000,\n  chat_limit: 5000,\n  remote_limit: 100_000,\n  upload_limit: 16_000_000,\n  avatar_upload_limit: 2_000_000,\n  background_upload_limit: 4_000_000,\n  banner_upload_limit: 4_000_000,\n  poll_limits: %{\n    max_expiration: 31_536_000,\n    max_option_chars: 200,\n    max_options: 20,\n    min_expiration: 0\n  },\n  registrations_open: true,\n  federating: true,\n  federation_incoming_replies_max_depth: 100,\n  federation_reachability_timeout_days: 7,\n  federation_publisher_modules: [Pleroma.Web.ActivityPub.Publisher],\n  allow_relay: true,\n  public: true,\n  quarantined_instances: [],\n  managed_config: true,\n  static_dir: \"instance/static/\",\n  allowed_post_formats: [\"text/plain\", \"text/html\", \"text/markdown\", \"text/bbcode\"],\n  autofollowed_nicknames: [],\n  max_pinned_statuses: 1,\n  attachment_links: false,\n  max_report_comment_size: 1000,\n  safe_dm_mentions: false,\n  healthcheck: false,\n  remote_post_retention_days: 90,\n  skip_thread_containment: true,\n  limit_to_local_content: :unauthenticated,\n  user_bio_length: 5000,\n  user_name_length: 100,\n  max_account_fields: 10,\n  max_remote_account_fields: 20,\n  account_field_name_length: 512,\n  account_field_value_length: 2048,\n  external_user_synchronization: true,\n  extended_nickname_format: true,\n  multi_factor_authentication: [\n    totp: [digits: 6, period: 30],\n    backup_codes: [number: 2, length: 6]\n  ]\n"
+    end
+  end
+
+  describe "rollback/1" do
+    test "configuration from database is not configured" do
+      clear_config(:configurable_from_database, false)
+
+      Mix.Tasks.Pleroma.Config.run(["rollback"])
+
+      assert_received {:mix_shell, :error, [message]}
+
+      assert message =~
+               "Config rollback is not allowed in config. You can change this behavior by setting `config :pleroma, configurable_from_database: true`"
+    end
+
+    test "error" do
+      Mix.Tasks.Pleroma.Config.run(["rollback"])
+
+      assert_receive {:mix_shell, :error,
+                      [
+                        "No version to rollback"
+                      ]},
+                     15
+    end
+
+    test "success rollback" do
+      insert(:config_version,
+        backup: [pleroma: [instance: [name: "First name", email: "email@example.com"]]]
+      )
+
+      insert(:config_version, current: true)
+
+      Mix.Tasks.Pleroma.Config.run(["rollback"])
+
+      assert_received {:mix_shell, :info, ["Success rollback"]}
+
+      [config] = Repo.all(ConfigDB)
+
+      assert config.value == [name: "First name", email: "email@example.com"]
+    end
+
+    test "rollback not possible error" do
+      insert(:config_version, current: true)
+
+      Mix.Tasks.Pleroma.Config.run(["rollback", "-s", "2"])
+
+      assert_received {:mix_shell, :error, [message]}
+
+      assert message =~ "Rollback not possible. Incorrect steps value."
     end
   end
 end
