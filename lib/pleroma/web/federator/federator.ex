@@ -85,6 +85,11 @@ defmodule Pleroma.Web.Federator do
         Logger.debug("Already had #{params["id"]}")
         {:error, :already_present}
 
+      {:error, {:validate_object, _}} = e ->
+        Logger.error("Incoming AP doc validation error: #{inspect(e)}")
+        Logger.debug(Jason.encode!(params, pretty: true))
+        e
+
       e ->
         # Just drop those for now
         Logger.debug("Unhandled activity")
