@@ -52,7 +52,7 @@ defmodule Pleroma.Web.ActivityPub.Transmogrifier.AnswerHandlingTest do
            )
   end
 
-  test "outgoing, rewrites Answer to Note" do
+  test "outgoing, doesn't rewrites Answer to Note" do
     user = insert(:user)
 
     {:ok, poll_activity} =
@@ -73,6 +73,6 @@ defmodule Pleroma.Web.ActivityPub.Transmogrifier.AnswerHandlingTest do
     {:ok, %Activity{local: false} = activity} = Transmogrifier.handle_incoming(data)
     {:ok, data} = Transmogrifier.prepare_outgoing(activity.data)
 
-    assert data["object"]["type"] == "Note"
+    assert data["object"]["type"] == "Answer"
   end
 end

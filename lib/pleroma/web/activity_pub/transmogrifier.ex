@@ -43,7 +43,6 @@ defmodule Pleroma.Web.ActivityPub.Transmogrifier do
     |> fix_content_map
     |> fix_addressing
     |> fix_summary
-    |> fix_type(options)
   end
 
   def fix_summary(%{"summary" => nil} = object) do
@@ -319,20 +318,6 @@ defmodule Pleroma.Web.ActivityPub.Transmogrifier do
 
   def fix_content_map(object), do: object
 
-  def fix_type(object, options \\ [])
-
-  def fix_type(%{"inReplyTo" => reply_id, "name" => _} = object, options)
-      when is_binary(reply_id) do
-    with true <- Federator.allowed_thread_distance?(options[:depth]),
-         {:ok, %{data: %{"type" => "Question"} = _} = _} <- get_obj_helper(reply_id, options) do
-      Map.put(object, "type", "Answer")
-    else
-      _ -> object
-    end
-  end
-
-  def fix_type(object, _), do: object
-
   # Reduce the object list to find the reported user.
   defp get_reported(objects) do
     Enum.reduce_while(objects, nil, fn ap_id, _ ->
@@ -342,29 +327,6 @@ defmodule Pleroma.Web.ActivityPub.Transmogrifier do
         _ -> {:cont, nil}
       end
     end)
-  end
-
-  # Compatibility wrapper for Mastodon votes
-  defp handle_create(%{"object" => %{"type" => "Answer"}} = data, _user) do
-    handle_incoming(data)
-  end
-
-  defp handle_create(%{"object" => object} = data, user) do
-    %{
-      to: data["to"],
-      object: object,
-      actor: user,
-      context: object["context"],
-      local: false,
-      published: data["published"],
-      additional:
-        Map.take(data, [
-          "cc",
-          "directMessage",
-          "id"
-        ])
-    }
-    |> ActivityPub.create()
   end
 
   def handle_incoming(data, options \\ [])
@@ -415,7 +377,22 @@ defmodule Pleroma.Web.ActivityPub.Transmogrifier do
         |> Map.put("actor", actor)
         |> fix_addressing()
 
-      with {:ok, created_activity} <- handle_create(data, user) do
+      params = %{
+        to: data["to"],
+        object: object,
+        actor: user,
+        context: object["context"],
+        local: false,
+        published: data["published"],
+        additional:
+          Map.take(data, [
+            "cc",
+            "directMessage",
+            "id"
+          ])
+      }
+
+      with {:ok, created_activity} <- ActivityPub.create(params) do
         reply_depth = (options[:depth] || 0) + 1
 
         if Federator.allowed_thread_distance?(reply_depth) do
@@ -724,7 +701,6 @@ defmodule Pleroma.Web.ActivityPub.Transmogrifier do
     |> set_replies
     |> strip_internal_fields
     |> strip_internal_tags
-    |> set_type
   end
 
   #  @doc
@@ -912,12 +888,6 @@ defmodule Pleroma.Web.ActivityPub.Transmogrifier do
     tags = object["tag"] || []
     Map.put(object, "sensitive", "nsfw" in tags)
   end
-
-  def set_type(%{"type" => "Answer"} = object) do
-    Map.put(object, "type", "Note")
-  end
-
-  def set_type(object), do: object
 
   def add_attributed_to(object) do
     attributed_to = object["attributedTo"] || object["actor"]

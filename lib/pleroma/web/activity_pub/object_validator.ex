@@ -252,6 +252,19 @@ defmodule Pleroma.Web.ActivityPub.ObjectValidator do
     EventValidator.cast_and_apply(object)
   end
 
+  def cast_and_apply(
+        %{"type" => "Note", "name" => _, "attributedTo" => actor, "id" => id} = object
+      ) do
+    # Shitty heurestic for Mastodon votes
+    if id =~ actor <> "#votes/" do
+      object
+      |> Map.put("type", "Answer")
+      |> AnswerValidator.cast_and_apply()
+    else
+      ArticleNoteValidator.cast_and_apply(object)
+    end
+  end
+
   def cast_and_apply(%{"type" => type} = object) when type in ~w[Article Note] do
     ArticleNoteValidator.cast_and_apply(object)
   end
