@@ -183,18 +183,19 @@ defmodule Pleroma.Web.ActivityPub.SideEffects do
       {:ok, notifications} = Notification.create_notifications(activity, do_send: false)
       {:ok, _user} = ActivityPub.increase_note_count_if_public(user, object)
 
-      if in_reply_to = object.data["inReplyTo"] do
+      depth = (meta[:depth] || 0) + 1
+
+      with in_reply_to <- object.data["inReplyTo"],
+           %Object{} <- Object.normalize(in_reply_to, true, depth: depth) do
         Object.increase_replies_count(in_reply_to)
       end
 
-      reply_depth = (meta[:depth] || 0) + 1
-
-      if Pleroma.Web.Federator.allowed_thread_distance?(reply_depth) and
+      if Pleroma.Web.Federator.allowed_thread_distance?(depth) and
            object.data["replies"] != nil do
         for reply_id <- object.data["replies"] do
           Pleroma.Workers.RemoteFetcherWorker.enqueue("fetch_remote", %{
             "id" => reply_id,
-            "depth" => reply_depth
+            "depth" => depth
           })
         end
       end
