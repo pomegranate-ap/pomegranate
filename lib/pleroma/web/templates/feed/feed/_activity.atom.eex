@@ -22,10 +22,6 @@
     <link type="text/html" href='<%= @data["external_url"] %>' rel="alternate"/>
   <% end %>
 
-  <%= for tag <- @data["tag"] || [] do %>
-    <category term="<%= tag %>"></category>
-  <% end %>
-
   <%= for attachment <- @data["attachment"] || [] do %>
     <link rel="enclosure" href="<%= attachment_href(attachment) %>" type="<%= attachment_type(attachment) %>"/>
   <% end %>
