@@ -636,7 +636,7 @@ defmodule Pleroma.Web.ActivityPub.Transmogrifier do
     data =
       data
       |> Map.put("object", object)
-      |> Map.merge(Utils.make_json_ld_header())
+      |> Map.merge(Builder.json_ld_header())
       |> Map.delete("bcc")
 
     {:ok, data}
@@ -657,7 +657,7 @@ defmodule Pleroma.Web.ActivityPub.Transmogrifier do
     data =
       data
       |> strip_internal_fields
-      |> Map.merge(Utils.make_json_ld_header())
+      |> Map.merge(Builder.json_ld_header())
       |> Map.delete("bcc")
 
     {:ok, data}
@@ -677,7 +677,7 @@ defmodule Pleroma.Web.ActivityPub.Transmogrifier do
       data =
         data
         |> Map.put("object", object)
-        |> Map.merge(Utils.make_json_ld_header())
+        |> Map.merge(Builder.json_ld_header())
 
       {:ok, data}
     end
@@ -695,7 +695,7 @@ defmodule Pleroma.Web.ActivityPub.Transmogrifier do
       data =
         data
         |> Map.put("object", object)
-        |> Map.merge(Utils.make_json_ld_header())
+        |> Map.merge(Builder.json_ld_header())
 
       {:ok, data}
     end
@@ -706,7 +706,7 @@ defmodule Pleroma.Web.ActivityPub.Transmogrifier do
       data
       |> strip_internal_fields
       |> maybe_fix_object_url
-      |> Map.merge(Utils.make_json_ld_header())
+      |> Map.merge(Builder.json_ld_header())
 
     {:ok, data}
   end
