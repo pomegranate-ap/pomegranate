@@ -397,30 +397,6 @@ defmodule Pleroma.Web.CommonAPI do
     |> check_expiry_date()
   end
 
-  def listen(user, data) do
-    visibility = Map.get(data, :visibility, "public")
-
-    with {to, cc} <- get_to_and_cc(user, [], nil, visibility, nil),
-         listen_data <-
-           data
-           |> Map.take([:album, :artist, :title, :length])
-           |> Map.new(fn {key, value} -> {to_string(key), value} end)
-           |> Map.put("type", "Audio")
-           |> Map.put("to", to)
-           |> Map.put("cc", cc)
-           |> Map.put("actor", user.ap_id),
-         {:ok, activity} <-
-           ActivityPub.listen(%{
-             actor: user,
-             to: to,
-             object: listen_data,
-             context: Utils.generate_context_id(),
-             additional: %{"cc" => cc}
-           }) do
-      {:ok, activity}
-    end
-  end
-
   def post(user, %{status: _} = data) do
     with {:ok, draft} <- Pleroma.Web.CommonAPI.ActivityDraft.create(user, data) do
       ActivityPub.create(draft.changes, draft.preview?)
