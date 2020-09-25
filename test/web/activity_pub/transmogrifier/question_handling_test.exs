@@ -162,7 +162,7 @@ defmodule Pleroma.Web.ActivityPub.Transmogrifier.QuestionHandlingTest do
 
     assert {:ok, %Activity{local: false} = activity} = Transmogrifier.handle_incoming(data)
 
-    assert {:error, {:validate_object, {:error, _}}} = Transmogrifier.handle_incoming(data)
+    assert {:error, {:validate, {:error, _}}} = Transmogrifier.handle_incoming(data)
   end
 
   test "accepts a Question with no content" do
