@@ -43,8 +43,6 @@ defmodule Pleroma.Web.AdminAPI.AdminAPIController do
            :user_activate,
            :user_deactivate,
            :user_approve,
-           :tag_users,
-           :untag_users,
            :right_add,
            :right_add_multiple,
            :right_delete,
@@ -335,32 +333,6 @@ defmodule Pleroma.Web.AdminAPI.AdminAPIController do
     conn
     |> put_view(AccountView)
     |> render("index.json", %{users: updated_users})
-  end
-
-  def tag_users(%{assigns: %{user: admin}} = conn, %{"nicknames" => nicknames, "tags" => tags}) do
-    with {:ok, _} <- User.tag(nicknames, tags) do
-      ModerationLog.insert_log(%{
-        actor: admin,
-        nicknames: nicknames,
-        tags: tags,
-        action: "tag"
-      })
-
-      json_response(conn, :no_content, "")
-    end
-  end
-
-  def untag_users(%{assigns: %{user: admin}} = conn, %{"nicknames" => nicknames, "tags" => tags}) do
-    with {:ok, _} <- User.untag(nicknames, tags) do
-      ModerationLog.insert_log(%{
-        actor: admin,
-        nicknames: nicknames,
-        tags: tags,
-        action: "untag"
-      })
-
-      json_response(conn, :no_content, "")
-    end
   end
 
   def list_users(conn, params) do
