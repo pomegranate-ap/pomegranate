@@ -442,4 +442,8 @@ defmodule Pleroma.Factory do
       phrase: "cofe"
     }
   end
+
+  def tag_factory do
+    %Pleroma.Tag{name: "verify"}
+  end
 end
