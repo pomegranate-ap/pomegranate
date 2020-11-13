@@ -237,8 +237,6 @@ defmodule Pleroma.Web.MastodonAPI.AccountView do
         nil
       end
 
-    {:ok, user_tags} = Pleroma.Repo.get_assoc(user, :tags)
-
     %{
       id: to_string(user.id),
       username: username_from_nickname(user.nickname),
@@ -272,7 +270,7 @@ defmodule Pleroma.Web.MastodonAPI.AccountView do
       pleroma: %{
         ap_id: user.ap_id,
         confirmation_pending: user.confirmation_pending,
-        tags: Enum.map(user_tags, & &1.name),
+        tags: User.tag_names(user),
         hide_followers_count: user.hide_followers_count,
         hide_follows_count: user.hide_follows_count,
         hide_followers: user.hide_followers,
