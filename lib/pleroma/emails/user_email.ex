@@ -16,7 +16,9 @@ defmodule Pleroma.Emails.UserEmail do
 
   defp recipient(email, nil), do: email
   defp recipient(email, name), do: {name, email}
-  defp recipient(%User{} = user), do: recipient(user.email, user.name)
+
+  @spec recipient(User.t()) :: String.t() | {String.t(), String.t()}
+  def recipient(%User{} = user), do: recipient(user.email, user.name)
 
   @spec welcome(User.t(), map()) :: Swoosh.Email.t()
   def welcome(user, opts \\ %{}) do

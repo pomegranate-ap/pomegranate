@@ -455,6 +455,7 @@ defmodule Pleroma.Notification do
       if do_send do
         Streamer.stream(["user", "user:notification"], notification)
         Push.send(notification)
+        Pleroma.Notificator.send(notification)
       end
 
       notification

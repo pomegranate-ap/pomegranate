@@ -7,6 +7,7 @@ defmodule Pleroma.NotificationTest do
 
   import Pleroma.Factory
   import Mock
+  import Swoosh.TestAssertions
 
   alias Pleroma.FollowingRelationship
   alias Pleroma.Notification
@@ -112,6 +113,44 @@ defmodule Pleroma.NotificationTest do
 
       subscriber_notifications = Notification.for_user(subscriber)
       assert Enum.empty?(subscriber_notifications)
+    end
+  end
+
+  describe "email notificators" do
+    test "when disabled globally" do
+      user =
+        insert(:user, email_notifications: %{"digest" => false, "notifications" => ["mention"]})
+
+      replier = insert(:user)
+      {:ok, activity} = CommonAPI.post(user, %{status: "status"})
+
+      {:ok, _reply} =
+        CommonAPI.post(replier, %{status: "reply", in_reply_to_status_id: activity.id})
+
+      refute_email_sent()
+    end
+
+    test "emails enabled" do
+      clear_config(Pleroma.Notificator,
+        enabled: true,
+        mods: [Pleroma.Notificators.EmailNotificator]
+      )
+
+      user =
+        insert(:user, email_notifications: %{"digest" => false, "notifications" => ["mention"]})
+
+      replier = insert(:user)
+      {:ok, activity} = CommonAPI.post(user, %{status: "status"})
+
+      {:ok, _reply} =
+        CommonAPI.post(replier, %{status: "reply", in_reply_to_status_id: activity.id})
+
+      ObanHelpers.perform_all()
+
+      assert_email_sent(
+        to: {user.name, user.email},
+        html_body: ~r/mentioned you in/i
+      )
     end
   end
 

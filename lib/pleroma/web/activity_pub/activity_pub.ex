@@ -102,7 +102,10 @@ defmodule Pleroma.Web.ActivityPub.ActivityPub do
              recipients: recipients,
              actor: object["actor"]
            }),
-         # TODO: add tests for expired activities, when Note type will be supported in new pipeline
+         # TODO: add tests, when Note type will be supported in new pipeline
+         # - for expired activities
+         # - for email notificator
+
          {:ok, _} <- maybe_create_activity_expiration(activity) do
       {:ok, activity, meta}
     end
