@@ -319,7 +319,7 @@
 ### Options
 
 - `--digest`/`--no-digest` - whether the user should receive digest emails
-- `--notifications` - what types of email notifications user should receive (can be aliased with `-n`)
+- `--notifications` - what types of email notifications user should receive (can be aliased with `-n`). To disable all types pass `off` value.
 
 Example:
 
